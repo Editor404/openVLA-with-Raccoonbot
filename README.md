@@ -2,8 +2,6 @@
 
 0~3번 server에서 실행, 4번 local-server 실행<br>
 
-⭐ 파일경로 내 **[physicalai_workspace]** 폴더명 수정 필요
-
 
 ## 0. Dependencies
 ```
@@ -21,10 +19,10 @@ pip install -r requirments.txt
 raw data를 rlds builder에 맞게 변경
 아래 명령문 그대로 실행
 ```
-cd /data/physicalai_workspace/Mujoco/raccoon_dataset
+cd /data/Mujoco/raccoon_dataset
 python convert_raw_to_openvla_rlds_intermediate.py \
---raw_root /data/physicalai_workspace/Mujoco/raccoon_dataset/raccoon_grasp/grasp_random_color_cylinder \
---out_root /data/physicalai_workspace/Mujoco/raccoon_dataset/raccoon_grasp/openvla_rlds_intermediate \
+--raw_root /data/Mujoco/raccoon_dataset/raccoon_grasp/grasp_random_color_cylinder \
+--out_root /data/Mujoco/raccoon_dataset/raccoon_grasp/openvla_rlds_intermediate \
 --val_ratio 0.1
 ```
 
@@ -32,28 +30,28 @@ python convert_raw_to_openvla_rlds_intermediate.py \
 rlds builder 실행
 아래 명령문 그대로 실행
 ```
-cd /data/physicalai_workspace/Mujoco/rlds_dataset_builder/raccoon_grasp
+cd /data/Mujoco/rlds_dataset_builder/raccoon_grasp
 tfds build --overwrite
 ```
 실행하면 root 하위에 tensorflow_datasets 폴더 생성됨
 ```
-mv /root/tensorflow_datasets /data/physicalai_workspace/Mujoco/
+mv /root/tensorflow_datasets /data/Mujoco/
 ```
 
 ## 3. Raccoonbot 기반 OpenVLA finetuning
 아래 명령어 그대로 실행 <br>
 (max_steps, save_steps 변경 가능)
 ```
-cd /data/physicalai_workspace/Mujoco/openvla
-export PYTHONPATH=/data/physicalai_workspace/Mujoco/openvla:$PYTHONPATH
+cd /data/Mujoco/openvla
+export PYTHONPATH=/data/Mujoco/openvla:$PYTHONPATH
 
 WANDB_MODE=disabled CUDA_VISIBLE_DEVICES=0 \
 torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
   --vla_path openvla/openvla-7b \
-  --data_root_dir /data/physicalai_workspace/Mujoco/tensorflow_datasets \
+  --data_root_dir /data/Mujoco/tensorflow_datasets \
   --dataset_name raccoon_grasp \
-  --run_root_dir /data/physicalai_workspace/Mujoco/raccoon_dataset/raccoon_grasp/openvla-runs \
-  --adapter_tmp_dir /data/physicalai_workspace/Mujoco/raccoon_dataset/raccoon_grasp/openvla-adapter-tmp \
+  --run_root_dir /data/Mujoco/raccoon_dataset/raccoon_grasp/openvla-runs \
+  --adapter_tmp_dir /data/Mujoco/raccoon_dataset/raccoon_grasp/openvla-adapter-tmp \
   --lora_rank 32 \
   --batch_size 8 \
   --grad_accumulation_steps 2 \
@@ -71,13 +69,13 @@ torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
 ```
 pip install -U huggingface_hub
 
-hf download fair-lab/openvla-7b-finetuned-raccoonbot --local-dir ./openvla-runs/openvla-7b-finetuned-raccoonbot
-```
+hf download fair-lab/openvla-7b-finetuned-raccoonbot --local-dir /data/openvla-runs/openvla-7b-finetuned-raccoonbot
+``` 
 
 ## 4-2. 서버측 코드 실행
 server 실행 명령문
 ```
-cd /data/physicalai_workspace/Mujoco/openvla
+cd /data/Mujoco/openvla
 CUDA_VISIBLE_DEVICES=0 python openvla_server.py \
   --model_path /data/openvla-runs/openvla-7b-finetuned-raccoonbot \
   --default-unnorm-key raccoon_grasp \
