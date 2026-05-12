@@ -7,6 +7,10 @@
 
 ## 0. Dependencies
 ```
+git clone https://github.com/KWU-FAIR-LAB/Raccoonbot_Openvla.git
+```
+
+```
 pip install -r requirments.txt
 ```
 
@@ -70,11 +74,20 @@ target_color를 **[red, blue, green, yellow]** 로 수정하면 그에 맞게 pr
 python openvla_multicolor_client.py --server_url http://127.0.0.1:8000 --xml_path Raccoon_colored_cylinder.xml --target_color red --use_viewer
 ```
 
+
+## 4-1. Hugging Face에서 RaccoonBot finetuned OpenVLA 모델 다운로드
+서버에서 terminal에 아래 명령어를 입력하여 모델 다운로드
+```
+pip install -U huggingface_hub
+
+hf download fair-lab/openvla-7b-finetuned-raccoonbot --local-dir ./openvla-runs/openvla-7b-finetuned-raccoonbot
+```
+
 ⭐ server 실행 명령문 (수정 필요)
 ```
 cd /data/physicalai_workspace/Mujoco/openvla
 CUDA_VISIBLE_DEVICES=0 python openvla_server.py \
-  --model_path /data/physicalai_workspace/Mujoco/raccoon_dataset/raccoon_grasp/openvla-runs/[하위폴더명] \
+  --model_path /data/physicalai_workspace/openvla-runs/openvla-7b-finetuned-raccoonbot \
   --default-unnorm-key raccoon_grasp \
   --host 0.0.0.0 \
   --port 8000 \
