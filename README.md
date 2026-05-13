@@ -12,14 +12,26 @@ git clone https://github.com/KWU-FAIR-LAB/Raccoonbot_Openvla.git
 
 필요한 패키지 설치
 ```
-cd Raccoonbot_Openvla/openvla
+apt update
+apt install -y \
+  libegl1 \
+  libgl1 \
+  libglvnd0 \
+  libglx0 \
+  libopengl0 \
+  libgles2 \
+  libegl1-mesa \
+  libegl1-mesa-dev \
+  mesa-utils
 
-pip install -e .
+cd Raccoonbot_Openvla/openvla
+pip install .
 ```
 
 ## 1. Dataset 생성
 MuJoCo 가상환경에서 finetuning을 위한 데이터를 수집
 ```
+cd /data/Raccoonbot_Openvla/Mujoco
 python raccoon_grasp_multicolor_scene_dataset.py
 ```
 
@@ -27,10 +39,10 @@ python raccoon_grasp_multicolor_scene_dataset.py
 raw data를 rlds builder에 맞게 변경
 아래 명령문 그대로 실행
 ```
-cd /data/Raccoonbot_Openvla/raccoon_dataset
+cd /data/Raccoonbot_Openvla/Mujoco/raccoon_dataset
 python convert_raw_to_openvla_rlds_intermediate.py \
---raw_root /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/grasp_random_color_cylinder \
---out_root /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/openvla_rlds_intermediate \
+--raw_root /data/Raccoonbot_Openvla/Mujoco/raccoon_grasp_colored_cylinder \
+--out_root /data/Raccoonbot_Openvla/Mujoco/raccoon_dataset/openvla_rlds_intermediate \
 --val_ratio 0.1
 ```
 
@@ -38,7 +50,7 @@ python convert_raw_to_openvla_rlds_intermediate.py \
 rlds builder 실행
 아래 명령문 그대로 실행
 ```
-cd /data/Raccoonbot_Openvla/rlds_dataset_builder/raccoon_grasp
+cd /data/Raccoonbot_Openvla/Mujoco/rlds_dataset_builder/raccoon_pick_place
 tfds build --overwrite
 ```
 실행하면 root 하위에 tensorflow_datasets 폴더 생성됨
