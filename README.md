@@ -29,8 +29,8 @@ pip install .
 ```
 
 ## 1. Dataset 생성
-MuJoCo 가상환경에서 finetuning을 위한 데이터를 수집 <br>
-(main 함수에서 변수 num_episodes으로 dataset sample 수 변경 가능)
+MuJoCo 가상환경에서 finetuning을 위한 데이터를 수집
+(main 함수에서 변수 `num_episodes`으로 dataset sample 수 변경 가능)
 ```
 cd /data/Raccoonbot_Openvla/Mujoco
 python raccoon_grasp_multicolor_scene_dataset.py
@@ -61,7 +61,7 @@ mv /root/tensorflow_datasets /data/Raccoonbot_Openvla/
 
 ## 3. Raccoonbot 기반 OpenVLA finetuning
 아래 명령어 그대로 실행 <br>
-(max_steps, save_steps 변경 가능)
+(`max_steps`, `save_steps` 변경 가능)
 ```
 cd /data/Raccoonbot_Openvla/openvla
 export PYTHONPATH=/data/Raccoonbot_Openvla/openvla:$PYTHONPATH
@@ -115,7 +115,8 @@ pip install -r requirments.txt
 ```
 
 ## 4-4. 클라이언트측 코드 실행
-target_color를 **[red, blue, green, yellow]** 로 수정하면 그에 맞게 prompt가 변경됨 <br>
+target_color를 **[red, blue, green, yellow]** 로 수정하면 그에 맞게 prompt가 변경됨
+
 ⭐ local 실행 명령문
 ```
 python openvla_multicolor_client.py --server_url http://127.0.0.1:8000 --xml_path Raccoon_colored_cylinder.xml --target_color red --use_viewer
