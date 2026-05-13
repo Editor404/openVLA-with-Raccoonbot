@@ -71,9 +71,9 @@ WANDB_MODE=disabled CUDA_VISIBLE_DEVICES=0 \
 torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
   --vla_path openvla/openvla-7b \
   --data_root_dir /data/Raccoonbot_Openvla/tensorflow_datasets \
-  --dataset_name raccoon_grasp \
-  --run_root_dir /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/openvla-runs \
-  --adapter_tmp_dir /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/openvla-adapter-tmp \
+  --dataset_name raccoon_pick_place \
+  --run_root_dir /data/Raccoonbot_Openvla/openvla/openvla-runs \
+  --adapter_tmp_dir /data/Raccoonbot_Openvla/openvla/openvla-adapter-tmp \
   --lora_rank 32 \
   --batch_size 8 \
   --grad_accumulation_steps 2 \
@@ -91,7 +91,7 @@ torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
 ```
 pip install -U huggingface_hub
 
-hf download fair-lab/openvla-7b-finetuned-raccoonbot --local-dir /data/openvla-runs/openvla-7b-finetuned-raccoonbot
+hf download fair-lab/openvla-7b-finetuned-raccoonbot --local-dir /data/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b-finetuned-raccoonbot
 ``` 
 
 ## 4-2. 서버측 코드 실행
@@ -99,7 +99,7 @@ server 실행 명령문
 ```
 cd /data/Raccoonbot_Openvla/openvla
 CUDA_VISIBLE_DEVICES=0 python openvla_server.py \
-  --model_path /data/openvla-runs/openvla-7b-finetuned-raccoonbot \
+  --model_path /data/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b-finetuned-raccoonbot \
   --default-unnorm-key raccoon_pick_place \
   --host 0.0.0.0 \
   --port 8000 \
