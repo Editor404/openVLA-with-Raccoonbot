@@ -27,10 +27,10 @@ python raccoon_grasp_multicolor_scene_dataset.py
 raw data를 rlds builder에 맞게 변경
 아래 명령문 그대로 실행
 ```
-cd /data/Mujoco/raccoon_dataset
+cd /data/Raccoonbot_Openvla/raccoon_dataset
 python convert_raw_to_openvla_rlds_intermediate.py \
---raw_root /data/Mujoco/raccoon_dataset/raccoon_grasp/grasp_random_color_cylinder \
---out_root /data/Mujoco/raccoon_dataset/raccoon_grasp/openvla_rlds_intermediate \
+--raw_root /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/grasp_random_color_cylinder \
+--out_root /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/openvla_rlds_intermediate \
 --val_ratio 0.1
 ```
 
@@ -38,28 +38,28 @@ python convert_raw_to_openvla_rlds_intermediate.py \
 rlds builder 실행
 아래 명령문 그대로 실행
 ```
-cd /data/Mujoco/rlds_dataset_builder/raccoon_grasp
+cd /data/Raccoonbot_Openvla/rlds_dataset_builder/raccoon_grasp
 tfds build --overwrite
 ```
 실행하면 root 하위에 tensorflow_datasets 폴더 생성됨
 ```
-mv /root/tensorflow_datasets /data/Mujoco/
+mv /root/tensorflow_datasets /data/Raccoonbot_Openvla/
 ```
 
 ## 3. Raccoonbot 기반 OpenVLA finetuning
 아래 명령어 그대로 실행 <br>
 (max_steps, save_steps 변경 가능)
 ```
-cd /data/Mujoco/openvla
-export PYTHONPATH=/data/Mujoco/openvla:$PYTHONPATH
+cd /data/Raccoonbot_Openvla/openvla
+export PYTHONPATH=/data/Raccoonbot_Openvla/openvla:$PYTHONPATH
 
 WANDB_MODE=disabled CUDA_VISIBLE_DEVICES=0 \
 torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
   --vla_path openvla/openvla-7b \
-  --data_root_dir /data/Mujoco/tensorflow_datasets \
+  --data_root_dir /data/Raccoonbot_Openvla/tensorflow_datasets \
   --dataset_name raccoon_grasp \
-  --run_root_dir /data/Mujoco/raccoon_dataset/raccoon_grasp/openvla-runs \
-  --adapter_tmp_dir /data/Mujoco/raccoon_dataset/raccoon_grasp/openvla-adapter-tmp \
+  --run_root_dir /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/openvla-runs \
+  --adapter_tmp_dir /data/Raccoonbot_Openvla/raccoon_dataset/raccoon_grasp/openvla-adapter-tmp \
   --lora_rank 32 \
   --batch_size 8 \
   --grad_accumulation_steps 2 \
@@ -83,7 +83,7 @@ hf download fair-lab/openvla-7b-finetuned-raccoonbot --local-dir /data/openvla-r
 ## 4-2. 서버측 코드 실행
 server 실행 명령문
 ```
-cd /data/Mujoco/openvla
+cd /data/Raccoonbot_Openvla/openvla
 CUDA_VISIBLE_DEVICES=0 python openvla_server.py \
   --model_path /data/openvla-runs/openvla-7b-finetuned-raccoonbot \
   --default-unnorm-key raccoon_pick_place \
