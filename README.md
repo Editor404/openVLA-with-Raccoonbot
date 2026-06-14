@@ -260,21 +260,8 @@ CUDA_VISIBLE_DEVICES=0 python3 openvla_server.py \
 task-balanced 학습 체크포인트를 사용할 때는 checkpoint의
 `dataset_statistics.json`에 저장된 normalization key를 확인해야 합니다.
 
-## 6. 원격 서버 연결
 
-서버의 8000 포트가 외부에 공개되지 않은 경우 SSH 터널을 사용합니다.
-
-```bash
-ssh -L 8000:127.0.0.1:8000 USER@HOST -p PORT
-```
-
-터널이 열린 동안 로컬 클라이언트는 다음 주소를 사용합니다.
-
-```text
-http://127.0.0.1:8000
-```
-
-## 7. MuJoCo 클라이언트 실행
+## 6. MuJoCo 클라이언트 실행
 
 클라이언트 파일은 저장소 상위의 `executeCode/`에 있다고 가정합니다.
 
@@ -297,7 +284,7 @@ SERVER_URL=http://127.0.0.1:8000 \
 DRY_RUN=1 ./scripts/run_sim_client.sh
 ```
 
-## 8. 실제 RaccoonBot 실행
+## 7. 실제 RaccoonBot 실행
 
 실제 로봇이 움직이므로 작업 공간과 비상 정지 상태를 먼저 확인해야
 합니다. 실수로 실행되지 않도록 `USE_REAL_ROBOT=1`을 명시해야 합니다.
@@ -346,18 +333,6 @@ python3 -m unittest -v \
 | `results/logs/training.log` | 기존 A100 학습 기록 발췌 |
 | `results/logs/inference_server.log` | 추론 서버 및 action 출력 발췌 |
 
-## Git에 포함하지 않는 파일
-
-과제 지침과 저장소 용량 제한에 따라 다음 파일은 커밋하지 않습니다.
-
-- raw MuJoCo 이미지 데이터
-- RLDS intermediate 데이터
-- TFRecord 및 `tensorflow_datasets/`
-- LoRA adapter 및 학습 checkpoint
-- `*.safetensors`, `*.pt`, `*.pth`, `*.ckpt`
-- 데이터 전송용 대용량 압축파일
-
-이 파일들은 위 명령으로 재생성하거나 별도 스토리지에서 관리해야 합니다.
 
 ## 참고
 
