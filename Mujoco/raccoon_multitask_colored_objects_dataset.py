@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 
 
-DATASET_GENERATOR_VERSION = "2026-06-14-action-safe-v7-open-approach"
+DATASET_GENERATOR_VERSION = "2026-06-14-multitask-v1-push-pick-place"
 SCRIPT_DIR = Path(__file__).resolve().parent
 
 
@@ -197,6 +197,20 @@ class SyncSimRaccoonDataset:
         "hold the {color} {object}",
         "move to the {color} {object} and grasp it",
     )
+    MULTITASK_INSTRUCTION_TEMPLATES = {
+        "push": (
+            "push the {color} {object} forward",
+            "move the {color} {object} forward",
+            "slide the {color} {object} away from the robot",
+            "nudge the {color} {object} forward",
+        ),
+        "pick_and_place": (
+            "pick up the {color} {object} and place it in the drop zone",
+            "move the {color} {object} to the drop zone",
+            "grasp the {color} {object} and put it down in the target area",
+            "relocate the {color} {object} to the drop zone",
+        ),
+    }
 
     # MuJoCo geom sizes:
     # - cylinder: [radius, halfheight, 0]
@@ -858,10 +872,16 @@ class SyncSimRaccoonDataset:
         forced_target = forced_target or {}
         forced_color = forced_target.get("color")
         forced_object_type = forced_target.get("object_type")
+        forced_x_range = forced_target.get("x_range")
+        forced_y_range = forced_target.get("y_range")
         if forced_color is not None and forced_color not in colors:
             raise ValueError(f"forced target color={forced_color}가 colors={colors}에 없습니다.")
         if forced_object_type is not None and forced_object_type not in object_types:
             raise ValueError(f"forced object_type={forced_object_type}가 object_types={object_types}에 없습니다.")
+        if forced_x_range is not None and forced_x_range[0] >= forced_x_range[1]:
+            raise ValueError(f"잘못된 forced target x_range입니다: {forced_x_range}")
+        if forced_y_range is not None and forced_y_range[0] >= forced_y_range[1]:
+            raise ValueError(f"잘못된 forced target y_range입니다: {forced_y_range}")
 
         specs = {}
         placed_xy = []
@@ -878,8 +898,18 @@ class SyncSimRaccoonDataset:
                 raise ValueError(f"지원하지 않는 색상입니다: {color}")
 
             for _ in range(max_tries):
-                x = float(rng.uniform(x_range[0], x_range[1]))
-                y = float(rng.uniform(y_range[0], y_range[1]))
+                sample_x_range = (
+                    forced_x_range
+                    if color == forced_color and forced_x_range is not None
+                    else x_range
+                )
+                sample_y_range = (
+                    forced_y_range
+                    if color == forced_color and forced_y_range is not None
+                    else y_range
+                )
+                x = float(rng.uniform(sample_x_range[0], sample_x_range[1]))
+                y = float(rng.uniform(sample_y_range[0], sample_y_range[1]))
                 xy = np.array([x, y], dtype=np.float64)
 
                 required_distances = [
@@ -1319,7 +1349,7 @@ class SyncSimRaccoonDataset:
                 renderer_close()
             self.renderer = None
 
-    # ---------- grasp-only plan ----------
+    # ---------- task plans ----------
 
     def make_grasp_plan(self, object_x, object_y, object_type=None):
         object_type = str(object_type or getattr(self, "active_object_type", "cylinder"))
@@ -1336,6 +1366,110 @@ class SyncSimRaccoonDataset:
             [object_x, object_y, z_grasp, 1],   # Close gripper around the object.
             [object_x, object_y, z_lift, 1],    # Lift while keeping the gripper closed.
         ]
+
+    def make_push_plan(self, object_x, object_y, goal_xy, object_type=None):
+        object_type = str(object_type or getattr(self, "active_object_type", "cylinder"))
+        if object_type not in self.SUPPORTED_OBJECT_TYPES:
+            raise ValueError(f"지원하지 않는 object_type입니다: {object_type}")
+
+        goal_x, goal_y = (float(goal_xy[0]), float(goal_xy[1]))
+        direction = np.asarray([goal_x - object_x, goal_y - object_y], dtype=np.float64)
+        distance = float(np.linalg.norm(direction))
+        if distance <= 0:
+            raise ValueError("push goal은 object 위치와 달라야 합니다.")
+        direction /= distance
+        start_xy = np.asarray([object_x, object_y], dtype=np.float64) - direction * 0.025
+        # A closed gripper commanded at 3 cm places the finger faces near the
+        # object centroid. Reusing grasp height drives the fingers into the
+        # floor and fails to produce a horizontal push.
+        push_z = 0.030
+
+        return [
+            [float(start_xy[0]), float(start_xy[1]), 0.08, 0],
+            [float(start_xy[0]), float(start_xy[1]), 0.08, 1],
+            [float(start_xy[0]), float(start_xy[1]), push_z, 1],
+            [goal_x, goal_y, push_z, 1],
+            [goal_x, goal_y, 0.08, 0],
+        ]
+
+    def make_pick_and_place_plan(self, object_x, object_y, goal_xy, object_type=None):
+        object_type = str(object_type or getattr(self, "active_object_type", "cylinder"))
+        goal_x, goal_y = (float(goal_xy[0]), float(goal_xy[1]))
+        z_grasp = self.GRASP_HEIGHT_BY_OBJECT_TYPE[object_type]
+        z_lift = 0.08
+        z_place = 0.025
+
+        return [
+            [object_x, object_y, 0.10, 0],
+            [object_x, object_y, z_grasp, 0],
+            [object_x, object_y, z_grasp, 1],
+            [object_x, object_y, z_lift, 1],
+            [goal_x, goal_y, z_lift, 1],
+            [goal_x, goal_y, z_place, 1],
+            [goal_x, goal_y, z_place, 0],
+            [goal_x, goal_y, z_lift, 0],
+        ]
+
+    def make_task_plan(self, task_type, object_x, object_y, goal_xy, object_type=None):
+        if task_type == "push":
+            return self.make_push_plan(
+                object_x,
+                object_y,
+                goal_xy,
+                object_type=object_type,
+            )
+        if task_type == "pick_and_place":
+            return self.make_pick_and_place_plan(
+                object_x,
+                object_y,
+                goal_xy,
+                object_type=object_type,
+            )
+        raise ValueError(f"지원하지 않는 task_type입니다: {task_type}")
+
+    def validate_task_plan_ik(
+        self,
+        task_type,
+        object_x,
+        object_y,
+        goal_xy,
+        object_type=None,
+    ):
+        plan = self.make_task_plan(
+            task_type,
+            object_x,
+            object_y,
+            goal_xy,
+            object_type=object_type,
+        )
+        checked_positions = set()
+        previous_position = None
+        for waypoint_index, action in enumerate(plan):
+            position = tuple(float(value) for value in action[:3])
+            positions_to_check = [position]
+            if previous_position is not None:
+                positions_to_check = self.interpolate_cartesian_segment(
+                    previous_position,
+                    position,
+                    max_step=0.002,
+                )
+            for sample_index, sample in enumerate(positions_to_check):
+                sampled_position = tuple(float(value) for value in sample)
+                if sampled_position in checked_positions:
+                    continue
+                checked_positions.add(sampled_position)
+                angles = self._calc_inv_kinematics(
+                    *(value * 100.0 for value in sampled_position)
+                )
+                if angles is None:
+                    raise ValueError(
+                        f"{task_type} IK precheck failed: waypoint={waypoint_index} "
+                        f"segment_sample={sample_index} "
+                        f"xyz_m=({sampled_position[0]:.4f}, "
+                        f"{sampled_position[1]:.4f}, {sampled_position[2]:.4f})"
+                    )
+            previous_position = position
+        return plan
 
     @staticmethod
     def interpolate_cartesian_segment(start_xyz, target_xyz, max_step):
@@ -1839,6 +1973,376 @@ def run_episode_and_record(
         raise e
 
 
+def _sample_task_goal(task_type, target_spec, object_specs):
+    target_xy = np.asarray(
+        [float(target_spec["x"]), float(target_spec["y"])],
+        dtype=np.float64,
+    )
+    if task_type == "push":
+        # The fixed horizontal gripper orientation produces a clean forward
+        # push near the centerline. The collector places push targets directly
+        # in this corridor instead of relying on repeated full-range rejection.
+        if abs(float(target_xy[0])) > 0.012:
+            raise ValueError("push target is outside the reliable center corridor")
+        goal_xy = target_xy + np.asarray([0.0, 0.04], dtype=np.float64)
+        if goal_xy[1] > 0.225:
+            raise ValueError("push target is too close to the far workspace boundary")
+    elif task_type == "pick_and_place":
+        x_offset = -0.08 if target_xy[0] >= 0.0 else 0.08
+        goal_xy = target_xy + np.asarray([x_offset, 0.0], dtype=np.float64)
+        if goal_xy[0] < -0.12 or goal_xy[0] > 0.12:
+            raise ValueError("pick-and-place goal is outside the workspace")
+    else:
+        raise ValueError(f"지원하지 않는 task_type입니다: {task_type}")
+
+    for spec in object_specs.values():
+        other_xy = np.asarray([float(spec["x"]), float(spec["y"])])
+        if spec is target_spec:
+            continue
+        if float(np.linalg.norm(goal_xy - other_xy)) < 0.045:
+            raise ValueError("task goal is too close to a distractor")
+    return goal_xy
+
+
+def run_multitask_episode_and_record(
+    rc,
+    logger,
+    episode_id,
+    instruction,
+    task_type,
+    object_specs,
+    target_color,
+    target_object_type,
+    goal_xy,
+    speed=10,
+    settle_seconds_per_action=1.0,
+    initial_settle_seconds=0.5,
+    hz=100,
+    max_cartesian_step=0.002,
+    max_ee_delta=0.005,
+    max_joint_delta=0.35,
+    target_clearance=0.070,
+    max_non_target_displacement=0.003,
+    pre_close_alignment_tolerance=0.012,
+    pre_close_alignment_timeout_seconds=8.0,
+    diagnostic_logging=True,
+):
+    target_spec = object_specs[target_color]
+    target_body_name = target_spec["body_name"]
+    target_x = float(target_spec["x"])
+    target_y = float(target_spec["y"])
+    target_yaw = float(target_spec["yaw"])
+    goal_xy = np.asarray(goal_xy, dtype=np.float64)
+
+    rc.validate_target_clearance(object_specs, target_color, target_clearance)
+    plan = rc.validate_task_plan_ik(
+        task_type,
+        target_x,
+        target_y,
+        goal_xy,
+        object_type=target_object_type,
+    )
+
+    rc.reset_episode(object_specs=object_specs, target_color=target_color)
+    rc.lockh()
+    if initial_settle_seconds > 0:
+        rc.settle_steps(initial_settle_seconds)
+
+    initial_target_pose = rc.get_object_pose(target_body_name).copy()
+    initial_non_target_positions = rc.get_non_target_object_positions(
+        object_specs,
+        target_color,
+    )
+    logger.start_episode(
+        episode_id=episode_id,
+        instruction=instruction,
+        task_type=task_type,
+        goal_xy=goal_xy,
+        box_init_xy=[target_x, target_y],
+        box_init_yaw=target_yaw,
+        target_color=target_color,
+        target_object_type=target_object_type,
+        target_body_name=target_body_name,
+        all_object_init_poses=SyncSimRaccoonDataset.specs_to_meta(object_specs),
+        collection_config={
+            "hz": int(hz),
+            "speed": int(speed),
+            "settle_seconds_per_action": float(settle_seconds_per_action),
+            "max_cartesian_step": float(max_cartesian_step),
+            "max_ee_delta": float(max_ee_delta),
+            "max_joint_delta": float(max_joint_delta),
+            "target_clearance": float(target_clearance),
+            "max_non_target_displacement": float(max_non_target_displacement),
+            "pre_close_alignment_tolerance": float(pre_close_alignment_tolerance),
+            "pre_close_alignment_timeout_seconds": float(
+                pre_close_alignment_timeout_seconds
+            ),
+            "grasp_stabilizer_enabled": False,
+            "grasp_mode": "mujoco_physics_only",
+        },
+    )
+    logger.meta["task_diagnostics"] = []
+
+    try:
+        obs = rc.get_observation()
+        dt = 1.0 / hz
+        step_counter = 0
+        hold_frames = max(1, int(round(settle_seconds_per_action * hz)))
+        previous_gripper_command = 0.0
+        grasp_contact_confirmed = False
+
+        for waypoint_index, action in enumerate(plan):
+            target_xyz = np.asarray(action[:3], dtype=np.float64)
+            gripper_command = float(action[3])
+            is_close_transition = (
+                previous_gripper_command < 0.5 and gripper_command >= 0.5
+            )
+            motion_gripper_command = (
+                previous_gripper_command if is_close_transition else gripper_command
+            )
+
+            commanded_points = rc.interpolate_cartesian_segment(
+                obs["ee_pose"][:3],
+                target_xyz,
+                max_cartesian_step,
+            )
+            for commanded_xyz in commanded_points:
+                frame_action = [*commanded_xyz, motion_gripper_command]
+                rc.execute_action(frame_action, speed=speed)
+                logger.log_step(
+                    step_idx=step_counter,
+                    image_rgb=obs["image"],
+                    joint_angles=obs["joint_angles"],
+                    gripper_state=obs["gripper_state"],
+                    object_pose=obs["object_pose"],
+                    ee_pose=obs["ee_pose"],
+                    action=frame_action,
+                    is_first=(step_counter == 0),
+                    is_last=False,
+                )
+                rc.settle_steps(dt)
+                next_obs = rc.get_observation()
+                rc.validate_recorded_transition(
+                    obs,
+                    next_obs,
+                    max_ee_delta=max_ee_delta,
+                    max_joint_delta=max_joint_delta,
+                )
+                rc.validate_non_target_objects_undisturbed(
+                    object_specs,
+                    target_color,
+                    initial_non_target_positions,
+                    max_non_target_displacement,
+                )
+                obs = next_obs
+                step_counter += 1
+
+            if is_close_transition:
+                max_alignment_frames = max(
+                    1,
+                    int(round(pre_close_alignment_timeout_seconds * hz)),
+                )
+                for _ in range(max_alignment_frames):
+                    if rc.is_pre_close_aligned(
+                        obs["ee_pose"][:3],
+                        target_xyz,
+                        pre_close_alignment_tolerance,
+                    ):
+                        break
+                    frame_action = [*target_xyz.tolist(), 0.0]
+                    rc.execute_action(frame_action, speed=speed)
+                    logger.log_step(
+                        step_idx=step_counter,
+                        image_rgb=obs["image"],
+                        joint_angles=obs["joint_angles"],
+                        gripper_state=obs["gripper_state"],
+                        object_pose=obs["object_pose"],
+                        ee_pose=obs["ee_pose"],
+                        action=frame_action,
+                        is_first=False,
+                        is_last=False,
+                    )
+                    rc.settle_steps(dt)
+                    next_obs = rc.get_observation()
+                    rc.validate_recorded_transition(
+                        obs,
+                        next_obs,
+                        max_ee_delta=max_ee_delta,
+                        max_joint_delta=max_joint_delta,
+                    )
+                    obs = next_obs
+                    step_counter += 1
+                else:
+                    raise RuntimeError("pre-close alignment did not converge")
+            else:
+                max_alignment_frames = max(
+                    1,
+                    int(round(pre_close_alignment_timeout_seconds * hz)),
+                )
+                for _ in range(max_alignment_frames):
+                    if rc.is_pre_close_aligned(
+                        obs["ee_pose"][:3],
+                        target_xyz,
+                        pre_close_alignment_tolerance,
+                    ):
+                        break
+                    frame_action = [*target_xyz.tolist(), gripper_command]
+                    rc.execute_action(frame_action, speed=speed)
+                    logger.log_step(
+                        step_idx=step_counter,
+                        image_rgb=obs["image"],
+                        joint_angles=obs["joint_angles"],
+                        gripper_state=obs["gripper_state"],
+                        object_pose=obs["object_pose"],
+                        ee_pose=obs["ee_pose"],
+                        action=frame_action,
+                        is_first=(step_counter == 0),
+                        is_last=False,
+                    )
+                    rc.settle_steps(dt)
+                    next_obs = rc.get_observation()
+                    rc.validate_recorded_transition(
+                        obs,
+                        next_obs,
+                        max_ee_delta=max_ee_delta,
+                        max_joint_delta=max_joint_delta,
+                    )
+                    rc.validate_non_target_objects_undisturbed(
+                        object_specs,
+                        target_color,
+                        initial_non_target_positions,
+                        max_non_target_displacement,
+                    )
+                    grasp_contact_confirmed = bool(
+                        grasp_contact_confirmed or rc.grasp_contact_confirmed
+                    )
+                    obs = next_obs
+                    step_counter += 1
+                else:
+                    alignment_error = np.asarray(
+                        obs["ee_pose"][:3],
+                        dtype=np.float64,
+                    ) - target_xyz
+                    # During the contact segment of a push, the object itself
+                    # resists the commanded endpoint. Reaching the exact pose
+                    # is not required; the timeout already provides a bounded
+                    # sustained push command.
+                    if not (task_type == "push" and waypoint_index == 3):
+                        raise RuntimeError(
+                            f"{task_type} waypoint alignment did not converge: "
+                            f"waypoint={waypoint_index} "
+                            f"norm={np.linalg.norm(alignment_error):.6f}m"
+                        )
+
+            for _ in range(hold_frames):
+                frame_action = [*target_xyz.tolist(), gripper_command]
+                rc.execute_action(frame_action, speed=speed)
+                logger.log_step(
+                    step_idx=step_counter,
+                    image_rgb=obs["image"],
+                    joint_angles=obs["joint_angles"],
+                    gripper_state=obs["gripper_state"],
+                    object_pose=obs["object_pose"],
+                    ee_pose=obs["ee_pose"],
+                    action=frame_action,
+                    is_first=(step_counter == 0),
+                    is_last=False,
+                )
+                rc.settle_steps(dt)
+                next_obs = rc.get_observation()
+                rc.validate_recorded_transition(
+                    obs,
+                    next_obs,
+                    max_ee_delta=max_ee_delta,
+                    max_joint_delta=max_joint_delta,
+                )
+                rc.validate_non_target_objects_undisturbed(
+                    object_specs,
+                    target_color,
+                    initial_non_target_positions,
+                    max_non_target_displacement,
+                )
+                grasp_contact_confirmed = bool(
+                    grasp_contact_confirmed or rc.grasp_contact_confirmed
+                )
+                obs = next_obs
+                step_counter += 1
+
+            target_pose = rc.get_object_pose(target_body_name)
+            diagnostic = {
+                "waypoint_index": int(waypoint_index),
+                "commanded_xyz": target_xyz.tolist(),
+                "actual_ee_xyz": [float(v) for v in obs["ee_pose"][:3]],
+                "target_pose": [float(v) for v in target_pose],
+                "gripper_command": gripper_command,
+                "gripper_qpos": float(obs["gripper_state"]),
+                "grasp_contact_confirmed": bool(grasp_contact_confirmed),
+            }
+            logger.meta["task_diagnostics"].append(diagnostic)
+            if diagnostic_logging:
+                print(
+                    f"[Task diagnostic] episode_id={episode_id:06d} | "
+                    f"task_type='{task_type}' | waypoint={waypoint_index} | "
+                    f"target_xy={target_pose[:2].round(4).tolist()} | "
+                    f"goal_xy={goal_xy.round(4).tolist()} | "
+                    f"gripper_qpos={obs['gripper_state']:.4f} | "
+                    f"contact_confirmed={grasp_contact_confirmed}"
+                )
+            previous_gripper_command = gripper_command
+
+        logger.log_step(
+            step_idx=step_counter,
+            image_rgb=obs["image"],
+            joint_angles=obs["joint_angles"],
+            gripper_state=obs["gripper_state"],
+            object_pose=obs["object_pose"],
+            ee_pose=obs["ee_pose"],
+            action=plan[-1],
+            is_first=False,
+            is_last=True,
+        )
+
+        final_pose = rc.get_object_pose(target_body_name)
+        final_xy = np.asarray(final_pose[:2], dtype=np.float64)
+        goal_error = float(np.linalg.norm(final_xy - goal_xy))
+        displacement = float(
+            np.linalg.norm(final_xy - np.asarray(initial_target_pose[:2]))
+        )
+        if task_type == "push":
+            success = bool(
+                displacement >= 0.025
+                and goal_error <= 0.035
+                and float(final_pose[2]) <= float(initial_target_pose[2]) + 0.012
+            )
+        else:
+            gripper_reopened = float(obs["gripper_state"]) > rc.GRIP_OPEN - 0.03
+            success = bool(
+                grasp_contact_confirmed
+                and goal_error <= 0.035
+                and float(final_pose[2]) <= float(initial_target_pose[2]) + 0.015
+                and gripper_reopened
+            )
+
+        logger.meta["task_result"] = {
+            "goal_xy": goal_xy.tolist(),
+            "final_target_xy": final_xy.tolist(),
+            "goal_error": goal_error,
+            "target_displacement": displacement,
+            "grasp_contact_confirmed": bool(grasp_contact_confirmed),
+            "success": success,
+        }
+        print(
+            f"[Task result] episode_id={episode_id:06d} | task_type='{task_type}' | "
+            f"success={success} | displacement={displacement:.4f}m | "
+            f"goal_error={goal_error:.4f}m"
+        )
+        logger.finalize_episode(success=success)
+        return success
+    except Exception:
+        logger.abort_episode()
+        raise
+
+
 def _balanced_target_counts(num_episodes, target_units):
     """
     Return per-target episode counts. If num_episodes is divisible by the
@@ -1872,6 +2376,55 @@ def _sample_remaining_target(rng, target_counts, success_counts):
     return remaining_targets[idx]
 
 
+def _load_existing_multitask_progress(dataset_root, target_units):
+    """Recover successful unit counts and the next safe episode ID."""
+    dataset_root = Path(dataset_root)
+    target_units = set(target_units)
+    success_counts = {target_unit: 0 for target_unit in target_units}
+    max_episode_id = 0
+    loaded_successes = 0
+    skipped_entries = 0
+
+    if not dataset_root.exists():
+        return success_counts, 1, loaded_successes, skipped_entries
+
+    for episode_dir in sorted(dataset_root.glob("episode_*")):
+        if not episode_dir.is_dir():
+            continue
+        try:
+            episode_id = int(episode_dir.name.rsplit("_", 1)[1])
+        except (IndexError, ValueError):
+            skipped_entries += 1
+            continue
+        max_episode_id = max(max_episode_id, episode_id)
+
+        meta_path = episode_dir / "meta.json"
+        if not meta_path.is_file():
+            skipped_entries += 1
+            continue
+        try:
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            skipped_entries += 1
+            continue
+        if not bool(meta.get("success")):
+            continue
+
+        target_unit = (
+            str(meta.get("task_type", "")),
+            str(meta.get("target_color", "")),
+            str(meta.get("target_object_type", "")),
+        )
+        if target_unit not in target_units:
+            skipped_entries += 1
+            continue
+        success_counts[target_unit] += 1
+        loaded_successes += 1
+
+    return success_counts, max_episode_id + 1, loaded_successes, skipped_entries
+
+
 def _normalize_instruction_templates(instruction_templates=None, instruction_template=None):
     if instruction_templates is None:
         if instruction_template is None:
@@ -1890,12 +2443,11 @@ def _normalize_instruction_templates(instruction_templates=None, instruction_tem
 
 def collect_dataset(
     xml_path="Raccoon_colored_cylinder.xml",
-    dataset_root="raccoon_grasp_colored_objects",
-    num_episodes=1200,
+    dataset_root="raccoon_multitask_colored_objects",
+    num_episodes=720,
+    task_types=("push", "pick_and_place"),
     colors=("red", "blue", "green", "yellow"),
     object_types=("cylinder", "cube", "sphere"),
-    instruction_templates=None,
-    instruction_template=None,
     keep_failed=False,
     use_viewer=False,
     camera_name="front_view",
@@ -1921,35 +2473,23 @@ def collect_dataset(
     enable_grasp_stabilizer=False,
     pre_close_alignment_tolerance=0.012,
     pre_close_alignment_timeout_seconds=8.0,
+    resume=True,
 ):
     """
-    Collect a balanced grasp dataset for colored objects.
+    Collect balanced push and pick-and-place demonstrations.
 
-    Each episode contains all four colored objects at randomized positions.
-    The instruction selects which color/object pair is the target, and the robot
-    executes the grasp plan toward that prompted target only.
-
-    Default behavior with keep_failed=False:
-    - Saves exactly num_episodes successful episodes when possible.
-    - Balances successful episodes across (color, object_type) target pairs.
-    - Failed episodes are discarded and retried with the remaining target-pair quota.
-    - Before frame_000000 is captured, the scene is stepped for
-      initial_settle_seconds so free-joint objects are already resting on the table.
-
-    Position defaults leave clearance around the selected target:
-    - x range: -0.12~0.12
-    - y range:  0.14~0.22
-    - target-to-distractor clearance: at least 0.07 m
-
-    If keep_failed=True, failed episodes are also saved, so the final folder can
-    contain more than num_episodes attempts and the all-attempt ratio may differ.
+    The default 720 episodes produce 30 successful examples for each of:
+      2 tasks x 4 colors x 3 object types.
     """
+    task_types = tuple(task_types)
     colors = tuple(colors)
     object_types = tuple(object_types)
-    instruction_templates = _normalize_instruction_templates(
-        instruction_templates=instruction_templates,
-        instruction_template=instruction_template,
-    )
+    unknown_tasks = [
+        task for task in task_types
+        if task not in SyncSimRaccoonDataset.MULTITASK_INSTRUCTION_TEMPLATES
+    ]
+    if unknown_tasks:
+        raise ValueError(f"지원하지 않는 task_types입니다: {unknown_tasks}")
     valid_colors = set(SyncSimRaccoonDataset.CYLINDER_BODY_BY_COLOR.keys())
     unknown_colors = [color for color in colors if color not in valid_colors]
     if unknown_colors:
@@ -1979,13 +2519,35 @@ def collect_dataset(
     ):
         raise ValueError("motion limit 값은 모두 0보다 커야 합니다.")
 
-    target_units = tuple((color, object_type) for color in colors for object_type in object_types)
+    target_units = tuple(
+        (task_type, color, object_type)
+        for task_type in task_types
+        for color in colors
+        for object_type in object_types
+    )
     target_counts = _balanced_target_counts(num_episodes, target_units)
     rng = np.random.default_rng(seed)
 
+    if resume:
+        (
+            success_counts,
+            next_episode_id,
+            loaded_successes,
+            skipped_existing_entries,
+        ) = _load_existing_multitask_progress(dataset_root, target_units)
+    else:
+        success_counts = {target_unit: 0 for target_unit in target_units}
+        next_episode_id = 1
+        loaded_successes = 0
+        skipped_existing_entries = 0
+
     if max_attempts is None:
         # Prevent infinite loops if grasp repeatedly fails.
-        max_attempts = max(num_episodes * 20, num_episodes + 100)
+        remaining_episode_count = max(0, num_episodes - sum(success_counts.values()))
+        max_attempts = max(
+            remaining_episode_count * 20,
+            remaining_episode_count + 100,
+        )
 
     rc = SyncSimRaccoonDataset(
         xml_path=xml_path,
@@ -1996,12 +2558,21 @@ def collect_dataset(
     )
     logger = DatasetLogger(root_dir=dataset_root, keep_failed=keep_failed)
 
-    success_counts = {target_unit: 0 for target_unit in target_units}
     attempt_count = 0
     sample_rejection_count = 0
 
-    print(f"Target pair counts: {target_counts}")
-    print(f"Instruction templates: {instruction_templates}")
+    print(f"Target task/color/object counts: {target_counts}")
+    if resume:
+        print(
+            f"Resume: loaded_successes={loaded_successes}, "
+            f"next_episode_id={next_episode_id:06d}, "
+            f"skipped_existing_entries={skipped_existing_entries}, "
+            f"dataset_root='{Path(dataset_root)}'"
+        )
+    print(
+        "Instruction templates: "
+        f"{SyncSimRaccoonDataset.MULTITASK_INSTRUCTION_TEMPLATES}"
+    )
     print(
         f"Sampling config: x_range={object_x_range}, y_range={object_y_range}, "
         f"min_distance={min_object_distance}, max_ik_resamples={max_ik_resamples}, "
@@ -2023,17 +2594,41 @@ def collect_dataset(
             target_unit = _sample_remaining_target(rng, target_counts, success_counts)
             if target_unit is None:
                 break
-            target_color, target_object_type = target_unit
+            task_type, target_color, target_object_type = target_unit
 
-            template = str(rng.choice(instruction_templates))
+            template = str(
+                rng.choice(
+                    SyncSimRaccoonDataset.MULTITASK_INSTRUCTION_TEMPLATES[
+                        task_type
+                    ]
+                )
+            )
             instruction = template.format(color=target_color, object=target_object_type, object_type=target_object_type)
+            object_specs = None
+            goal_xy = None
             for ik_sample_index in range(1, max_ik_resamples + 1):
+                forced_target = {
+                    "color": target_color,
+                    "object_type": target_object_type,
+                }
+                if task_type == "push":
+                    forced_target.update(
+                        {
+                            "x_range": (-0.010, 0.010),
+                            # Leave 4 cm of forward push distance while keeping
+                            # the goal inside the reliable workspace.
+                            "y_range": (
+                                max(float(object_y_range[0]), 0.145),
+                                min(float(object_y_range[1]), 0.180),
+                            ),
+                        }
+                    )
                 try:
                     object_specs = SyncSimRaccoonDataset.sample_object_specs(
                         rng=rng,
                         colors=colors,
                         object_types=object_types,
-                        forced_target={"color": target_color, "object_type": target_object_type},
+                        forced_target=forced_target,
                         x_range=object_x_range,
                         y_range=object_y_range,
                         min_distance=min_object_distance,
@@ -2049,14 +2644,21 @@ def collect_dataset(
                     continue
                 target_spec = object_specs[target_color]
                 try:
+                    goal_xy = _sample_task_goal(
+                        task_type,
+                        target_spec,
+                        object_specs,
+                    )
                     rc.validate_target_clearance(
                         object_specs,
                         target_color,
                         min_clearance=target_clearance,
                     )
-                    rc.validate_grasp_plan_ik(
+                    rc.validate_task_plan_ik(
+                        task_type,
                         target_spec["x"],
                         target_spec["y"],
+                        goal_xy,
                         object_type=target_object_type,
                     )
                     break
@@ -2067,57 +2669,64 @@ def collect_dataset(
                         f"object='{target_object_type}' | sample={ik_sample_index}/{max_ik_resamples} | {exc}"
                     )
             else:
-                raise RuntimeError(
-                    "도달 가능한 grasp target을 샘플링하지 못했습니다. "
-                    f"color='{target_color}', object='{target_object_type}', "
+                print(
+                    "[Sample skip] 도달 가능한 multitask target을 이번 attempt에서 "
+                    "샘플링하지 못해 다음 attempt로 진행합니다. "
+                    f"task='{task_type}', color='{target_color}', "
+                    f"object='{target_object_type}', "
                     f"x_range={object_x_range}, y_range={object_y_range}, "
                     f"max_ik_resamples={max_ik_resamples}"
                 )
+                continue
 
-            # With keep_failed=False, failed attempts are deleted, so reusing the
-            # next successful episode id keeps folder numbering compact.
-            episode_id = attempt_count if keep_failed else (sum(success_counts.values()) + 1)
+            # Never derive IDs from the number of successes: resumed datasets
+            # may contain gaps or preserved failed episodes.
+            episode_id = next_episode_id
 
             try:
-                success = run_episode_and_record(
+                success = run_multitask_episode_and_record(
                     rc=rc,
                     logger=logger,
                     episode_id=episode_id,
                     instruction=instruction,
+                    task_type=task_type,
                     object_specs=object_specs,
                     target_color=target_color,
                     target_object_type=target_object_type,
+                    goal_xy=goal_xy,
                     speed=speed,
                     settle_seconds_per_action=settle_seconds_per_action,
                     initial_settle_seconds=initial_settle_seconds,
                     hz=hz,
-                    touch_threshold=touch_threshold,
                     diagnostic_logging=diagnostic_logging,
-                    min_lift_height=min_lift_height,
                     max_cartesian_step=max_cartesian_step,
                     max_ee_delta=max_ee_delta,
                     max_joint_delta=max_joint_delta,
                     target_clearance=target_clearance,
                     max_non_target_displacement=max_non_target_displacement,
-                    physical_hold_validation_seconds=physical_hold_validation_seconds,
                     pre_close_alignment_tolerance=pre_close_alignment_tolerance,
                     pre_close_alignment_timeout_seconds=pre_close_alignment_timeout_seconds,
                 )
 
                 if success:
                     success_counts[target_unit] += 1
+                    next_episode_id += 1
+                elif keep_failed:
+                    next_episode_id += 1
 
                 print(
                     f"[Attempt {attempt_count:04d}] episode_id={episode_id:06d} | "
-                    f"task_type='grasp' | color='{target_color}' | object='{target_object_type}' | "
+                    f"task_type='{task_type}' | color='{target_color}' | object='{target_object_type}' | "
                     f"target_xy=({object_specs[target_color]['x']:.3f}, {object_specs[target_color]['y']:.3f}) | "
+                    f"goal_xy=({goal_xy[0]:.3f}, {goal_xy[1]:.3f}) | "
                     f"instruction='{instruction}' | success={success} | "
                     f"success_counts={success_counts}"
                 )
             except Exception as e:
                 print(
-                    f"[Attempt {attempt_count:04d}] task_type='grasp' | "
-                    f"color='{target_color}' | object='{target_object_type}' | exception: {e}"
+                    f"[Attempt {attempt_count:04d}] task_type='{task_type}' | "
+                    f"color='{target_color}' | "
+                    f"object='{target_object_type}' | exception: {e}"
                 )
 
     finally:
@@ -2142,13 +2751,13 @@ if __name__ == "__main__":
         # Resolve paths from this file so local execution does not depend on
         # the terminal/notebook working directory.
         xml_path=SCRIPT_DIR / "Raccoon_colored_cylinder.xml",
-        dataset_root=SCRIPT_DIR / "raccoon_grasp_colored_objects",
-        # Large-scale training set: 100 successful episodes for each of the
-        # 12 color/object pairs (4 colors x 3 object types).
-        num_episodes=1200,
+        dataset_root=SCRIPT_DIR / "raccoon_multitask_colored_objects",
+        # 30 successful episodes for each task/color/object combination:
+        # 2 tasks x 4 colors x 3 object types x 30 = 720.
+        num_episodes=720,
+        task_types=("push", "pick_and_place"),
         colors=("red", "blue", "green", "yellow"),
         object_types=("cylinder", "cube", "sphere"),
-        instruction_templates=SyncSimRaccoonDataset.DEFAULT_INSTRUCTION_TEMPLATES,
         keep_failed=False,
         use_viewer=False,
         camera_name="front_view",
@@ -2169,4 +2778,6 @@ if __name__ == "__main__":
         enable_grasp_stabilizer=False,
         pre_close_alignment_tolerance=0.012,
         pre_close_alignment_timeout_seconds=8.0,
+        # Continue from existing successful meta.json files without overwriting.
+        resume=True,
     )

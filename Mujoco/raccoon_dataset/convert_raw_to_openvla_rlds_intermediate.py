@@ -172,14 +172,31 @@ def is_idle_transition(
     )
 
 
-def copy_episode_images(raw_episode_dir: Path, out_images_dir: Path, referenced_files: List[str]) -> None:
+def copy_episode_images(
+    raw_episode_dir: Path,
+    out_images_dir: Path,
+    referenced_files: List[str],
+    image_mode: str = "copy",
+) -> None:
     out_images_dir.mkdir(parents=True, exist_ok=True)
+    if image_mode not in {"copy", "hardlink", "symlink"}:
+        raise ValueError(f"Unsupported image_mode: {image_mode}")
     for image_file in referenced_files:
         src = raw_episode_dir / image_file
         dst = out_images_dir / image_file
         if not src.exists():
             raise FileNotFoundError(f"Image not found: {src}")
-        shutil.copy2(src, dst)
+        if dst.exists() or dst.is_symlink():
+            dst.unlink()
+        if image_mode == "hardlink":
+            try:
+                dst.hardlink_to(src)
+            except OSError:
+                shutil.copy2(src, dst)
+        elif image_mode == "symlink":
+            dst.symlink_to(src.resolve())
+        else:
+            shutil.copy2(src, dst)
 
 
 def convert_episode(
@@ -192,6 +209,7 @@ def convert_episode(
     min_gripper_delta: float = 1e-4,
     min_ee_delta_norm: float = 1e-6,
     keep_debug_fields: bool = True,
+    image_mode: str = "copy",
 ) -> Optional[Dict[str, Any]]:
     meta_path = raw_episode_dir / "meta.json"
     if not meta_path.exists():
@@ -237,7 +255,12 @@ def convert_episode(
 
     out_images_dir = out_episode_dir / "images"
     referenced_files = [str(step["image_file"]) for step in kept_steps]
-    copy_episode_images(raw_episode_dir, out_images_dir, referenced_files)
+    copy_episode_images(
+        raw_episode_dir,
+        out_images_dir,
+        referenced_files,
+        image_mode=image_mode,
+    )
 
     episode_steps: List[Dict[str, Any]] = []
     num_steps = len(kept_steps)
@@ -245,7 +268,13 @@ def convert_episode(
 
     for local_i, raw_i in enumerate(kept_indices):
         curr = raw_steps[raw_i]
-        next_raw_i = kept_indices[local_i + 1] if local_i + 1 < len(kept_indices) else None
+        # The action label must retain the collector's original control period.
+        # When idle observations are filtered, using the next *kept* index here
+        # merges several raw transitions into one large delta. That changes the
+        # action semantics and produces labels that do not match the client's
+        # per-step delta execution. Always supervise a retained observation with
+        # its immediate next raw frame instead.
+        next_raw_i = raw_i + 1 if raw_i + 1 < len(raw_steps) else None
         nxt = raw_steps[next_raw_i] if next_raw_i is not None else None
 
         state = pad_joint_state(
@@ -280,6 +309,7 @@ def convert_episode(
             "is_terminal": is_terminal,
             "timestep": int(curr.get("t", local_i)),
             "raw_index": int(raw_i),
+            "action_target_raw_index": int(next_raw_i) if next_raw_i is not None else None,
             "raw_waypoint_action": to_float_list(curr.get("action", [])),
         }
 
@@ -299,6 +329,12 @@ def convert_episode(
             "goal_xy": to_float_list(meta.get("goal_xy", [])),
             "box_init_xy": to_float_list(meta.get("box_init_xy", [])),
             "box_init_yaw": float(meta.get("box_init_yaw", 0.0)),
+            "task_type": str(meta.get("task_type", "")),
+            "target_color": meta.get("target_color"),
+            "target_object_type": meta.get("target_object_type"),
+            "target_body_name": meta.get("target_body_name"),
+            "dataset_generator_version": meta.get("dataset_generator_version"),
+            "collection_config": meta.get("collection_config"),
             "raw_episode_dir": raw_episode_dir.name,
             "num_steps_raw": len(raw_steps),
             "num_steps_converted": len(episode_steps),
@@ -306,7 +342,10 @@ def convert_episode(
             "eef_action_dim": 7,
             "action_semantics": {
                 "type": "EEF_POS",
-                "ee_position_action": "next_ee_pose[:3] - current_ee_pose[:3]",
+                "ee_position_action": (
+                    "immediate_raw_next_ee_pose[:3] - current_raw_ee_pose[:3]; "
+                    "idle filtering never merges multiple raw transitions"
+                ),
                 "ee_rotation_action": "[0,0,0] because raw data has no EE orientation deltas",
                 "gripper_action": "raw step['action'][3] mapped to 0=open, 1=close",
             },
@@ -354,6 +393,8 @@ def convert_dataset(
     min_gripper_delta: float = 1e-4,
     min_ee_delta_norm: float = 1e-6,
     keep_debug_fields: bool = True,
+    task_type: Optional[str] = None,
+    image_mode: str = "copy",
 ) -> None:
     raw_root = raw_root.resolve()
     out_root = out_root.resolve()
@@ -362,6 +403,19 @@ def convert_dataset(
     episode_dirs = sorted([p for p in raw_root.glob("episode_*") if p.is_dir()])
     if not episode_dirs:
         raise FileNotFoundError(f"No episode_* directories found under: {raw_root}")
+    if task_type is not None:
+        filtered_dirs = []
+        for episode_dir in episode_dirs:
+            meta_path = episode_dir / "meta.json"
+            if not meta_path.exists():
+                continue
+            if str(read_json(meta_path).get("task_type", "")) == task_type:
+                filtered_dirs.append(episode_dir)
+        episode_dirs = filtered_dirs
+        if not episode_dirs:
+            raise FileNotFoundError(
+                f"No task_type={task_type!r} episodes found under: {raw_root}"
+            )
 
     train_dirs, val_dirs = make_split_lists(episode_dirs, val_ratio=val_ratio, seed=seed)
 
@@ -387,6 +441,7 @@ def convert_dataset(
                 min_gripper_delta=min_gripper_delta,
                 min_ee_delta_norm=min_ee_delta_norm,
                 keep_debug_fields=keep_debug_fields,
+                image_mode=image_mode,
             )
             if result is None:
                 shutil.rmtree(out_episode_dir, ignore_errors=True)
@@ -417,6 +472,8 @@ def convert_dataset(
         "min_joint_delta_norm": min_joint_delta_norm,
         "min_gripper_delta": min_gripper_delta,
         "min_ee_delta_norm": min_ee_delta_norm,
+        "task_type_filter": task_type,
+        "image_mode": image_mode,
         "schema": {
             "episode_json": {
                 "episode_metadata": {
@@ -446,7 +503,10 @@ def convert_dataset(
         },
         "notes": [
             "state = [joint_angles padded to 7, gripper_state]",
-            "action = [next_ee_pose[:3] - current_ee_pose[:3], 0,0,0, gripper_cmd]",
+            (
+                "action = [immediate raw next_ee_pose[:3] - current raw ee_pose[:3], "
+                "0,0,0, gripper_cmd]; idle filtering never merges transitions"
+            ),
             "rotational deltas are zero-filled because raw data does not include EE orientation deltas",
             "raw waypoint action is preserved in each step as raw_waypoint_action for debugging",
             "This is an intermediate format; your TFDS/RLDS builder should load observation.image from disk and emit actual RLDS records.",
@@ -473,6 +533,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--min_gripper_delta", type=float, default=1e-4, help="Idle threshold for gripper delta")
     parser.add_argument("--min_ee_delta_norm", type=float, default=1e-6, help="Idle threshold for ee delta norm")
     parser.add_argument("--no_debug_fields", action="store_true", help="Do not keep ee/object/raw debug fields")
+    parser.add_argument(
+        "--task_type",
+        type=str,
+        default=None,
+        help="Only convert episodes whose meta.json task_type matches this value",
+    )
+    parser.add_argument(
+        "--image_mode",
+        choices=("copy", "hardlink", "symlink"),
+        default="copy",
+        help="How intermediate image files reference raw PNGs",
+    )
     return parser.parse_args()
 
 
@@ -490,4 +562,6 @@ if __name__ == "__main__":
         min_gripper_delta=args.min_gripper_delta,
         min_ee_delta_norm=args.min_ee_delta_norm,
         keep_debug_fields=not args.no_debug_fields,
+        task_type=args.task_type,
+        image_mode=args.image_mode,
     )

@@ -13,9 +13,12 @@ __pycache__/
 
 # datasets
 Mujoco/raccoon_dataset/openvla_rlds_intermediate/
+Mujoco/raccoon_grasp_colored_cylinder/
+Mujoco/raccoon_grasp_colored_objects/
 Mujoco/raccoon_dataset/raccoon_grasp_colored_cylinder/
 Mujoco/raccoon_dataset/tensorflow_datasets/
 Mujoco/raccoon_dataset/raccoon_grasp/
+tensorflow_datasets/
 data/
 *.tfrecord
 
@@ -23,8 +26,22 @@ data/
 runs/
 wandb/
 checkpoints/
+checkpoint/
 openvla-runs/
+openvla/openvla-runs/
+openvla/openvla-adapter-tmp/
+openvla-adapter-tmp/
 *.pt
 *.pth
 *.ckpt
 *.safetensors
+tensor.tar.gz
+*.tar.zst
+
+# generated task-balanced intermediate data
+Mujoco/raccoon_dataset/task_balanced_intermediate/
+
+# submission outputs: keep small evidence files, not large binaries
+results/**/*.mp4
+results/**/*.avi
+results/**/*.mov

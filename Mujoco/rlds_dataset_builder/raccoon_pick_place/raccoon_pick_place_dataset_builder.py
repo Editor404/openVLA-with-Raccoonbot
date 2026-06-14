@@ -7,7 +7,13 @@ import tensorflow as tf
 import tensorflow_datasets as tfds
 
 
-INTERMEDIATE_ROOT = Path("/data/Raccoonbot_Openvla/Mujoco/raccoon_dataset/openvla_rlds_intermediate")
+SCRIPT_DIR = Path(__file__).resolve().parent
+DEFAULT_INTERMEDIATE_ROOT = (
+    SCRIPT_DIR.parent.parent
+    / "raccoon_dataset"
+    / "task_balanced_intermediate"
+    / "raccoon_pick_and_place"
+)
 
 
 class RaccoonPickPlace(tfds.core.GeneratorBasedBuilder):
@@ -17,6 +23,8 @@ class RaccoonPickPlace(tfds.core.GeneratorBasedBuilder):
     RELEASE_NOTES = {
         "1.0.0": "Initial release for single-task Raccoon grasp dataset.",
     }
+    INTERMEDIATE_ROOT = DEFAULT_INTERMEDIATE_ROOT
+    DATASET_DESCRIPTION = "TFDS/RLDS dataset for RaccoonBot demonstrations."
 
     MANUAL_DOWNLOAD_INSTRUCTIONS = """
     Put the converted intermediate dataset under INTERMEDIATE_ROOT.
@@ -52,7 +60,7 @@ class RaccoonPickPlace(tfds.core.GeneratorBasedBuilder):
     def _info(self) -> tfds.core.DatasetInfo:
         return tfds.core.DatasetInfo(
             builder=self,
-            description="TFDS/RLDS builder for the Raccoon pick-and-place dataset.",
+            description=self.DATASET_DESCRIPTION,
             features=tfds.features.FeaturesDict({
                 "steps": tfds.features.Dataset({
                     "observation": tfds.features.FeaturesDict({
@@ -114,7 +122,7 @@ class RaccoonPickPlace(tfds.core.GeneratorBasedBuilder):
         )
 
     def _split_generators(self, dl_manager: tfds.download.DownloadManager):
-        root = INTERMEDIATE_ROOT
+        root = Path(self.INTERMEDIATE_ROOT)
 
         train_manifest = root / "manifest_train.jsonl"
         val_manifest = root / "manifest_val.jsonl"
@@ -160,10 +168,14 @@ class RaccoonPickPlace(tfds.core.GeneratorBasedBuilder):
                     elif "path" in item:
                         episode_dir = Path(item["path"])
                     elif "relative_episode_json" in item:
-                        episode_json_path = INTERMEDIATE_ROOT / item["relative_episode_json"]
+                        episode_json_path = Path(self.INTERMEDIATE_ROOT) / item["relative_episode_json"]
                         episode_dir = episode_json_path.parent
                     elif "raw_episode_dir" in item and "split" in item:
-                        episode_dir = INTERMEDIATE_ROOT / item["split"] / item["raw_episode_dir"]
+                        episode_dir = (
+                            Path(self.INTERMEDIATE_ROOT)
+                            / item["split"]
+                            / item["raw_episode_dir"]
+                        )
                     else:
                         raise KeyError(f"Unsupported manifest format: {item}")
 

@@ -684,5 +684,26 @@ OXE_DATASET_CONFIGS = {
         "state_obs_keys": ["state"],
         "state_encoding": StateEncoding.JOINT,
         "action_encoding": ActionEncoding.EEF_POS,
-    }
+    },
+    "raccoon_grasp": {
+        "image_obs_keys": {"primary": "image", "secondary": None, "wrist": None},
+        "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
+        "state_obs_keys": ["state"],
+        "state_encoding": StateEncoding.JOINT,
+        "action_encoding": ActionEncoding.EEF_POS,
+    },
+    "raccoon_push": {
+        "image_obs_keys": {"primary": "image", "secondary": None, "wrist": None},
+        "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
+        "state_obs_keys": ["state"],
+        "state_encoding": StateEncoding.JOINT,
+        "action_encoding": ActionEncoding.EEF_POS,
+    },
+    "raccoon_pick_and_place": {
+        "image_obs_keys": {"primary": "image", "secondary": None, "wrist": None},
+        "depth_obs_keys": {"primary": None, "secondary": None, "wrist": None},
+        "state_obs_keys": ["state"],
+        "state_encoding": StateEncoding.JOINT,
+        "action_encoding": ActionEncoding.EEF_POS,
+    },
 }

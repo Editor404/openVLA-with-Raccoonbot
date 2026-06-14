@@ -210,5 +210,12 @@ OXE_NAMED_MIXTURES: Dict[str, List[Tuple[str, float]]] = {
     "raccoon_pick_place": [
         ("raccoon_pick_place", 1.0),
     ],
+    # Equal task-level sampling. Raw episode counts may differ, but each
+    # dataset contributes one third of sampled trajectories during training.
+    "raccoon_task_balanced": [
+        ("raccoon_grasp", 1.0),
+        ("raccoon_push", 1.0),
+        ("raccoon_pick_and_place", 1.0),
+    ],
 }
 # fmt: on

@@ -1,0 +1,14 @@
+# Baseline inference server log placeholder
+
+Status: pending actual server run.
+
+Run command:
+
+  CHECKPOINT_DIR=/home/keivn/openVLA/checkpoint ./scripts/run_checkpoint_server.sh
+
+Expected evidence:
+
+- checkpoint path
+- loaded dataset_statistics.json with `raccoon_pick_place`
+- `/predict` action outputs
+- latency/action logs after code improvement

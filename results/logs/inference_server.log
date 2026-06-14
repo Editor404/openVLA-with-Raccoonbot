@@ -1,0 +1,26 @@
+# Extracted from ../raccoon_lab1.ipynb cell 46 on 2026-06-14.
+# A bounded excerpt is included to keep the repository small.
+!CUDA_VISIBLE_DEVICES=0 python openvla_server.py \
+  --model_path /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug \
+  --default-unnorm-key raccoon_pick_place \
+  --host 0.0.0.0 \
+  --port 8000 \
+  --device cuda
+Loading checkpoint shards: 100%|██████████████████| 4/4 [00:00<00:00,  4.95it/s]
+[INFO] Loaded dataset statistics from: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug/dataset_statistics.json
+[INFO] Available norm_stats keys: ['raccoon_pick_place']
+[PREDICT] instruction=grasp the red cylinder
+[PREDICT] unnorm_key=raccoon_pick_place
+[PREDICT] action=[-0.01240188606872275, 0.0022882910883602198, -0.0006932372738625483, 0.0, 0.0, 0.0, 0.996078431372549]
+[PREDICT] instruction=grasp the red cylinder
+[PREDICT] unnorm_key=raccoon_pick_place
+[PREDICT] action=[-0.026798919707536666, 0.003140561628137181, 0.0015133234949819014, 0.0, 0.0, 0.0, 0.996078431372549]
+[PREDICT] instruction=grasp the red cylinder
+[PREDICT] unnorm_key=raccoon_pick_place
+[PREDICT] action=[-0.026798919707536666, 0.003140561628137181, 0.0015133234949819014, 0.0, 0.0, 0.0, 0.996078431372549]
+[PREDICT] instruction=grasp the red cylinder
+[PREDICT] unnorm_key=raccoon_pick_place
+[PREDICT] action=[-0.026798919707536666, 0.0014360205485832583, 0.0015133234949819014, 0.0, 0.0, 0.0, 0.996078431372549]
+[PREDICT] instruction=grasp the red cylinder
+[PREDICT] unnorm_key=raccoon_pick_place
+[PREDICT] action=[-0.01240188606872275, 0.003992832167914129, 0.0017234721396337544, 0.0, 0.0, 0.0, 0.996078431372549]

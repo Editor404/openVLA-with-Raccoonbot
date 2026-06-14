@@ -1,0 +1,5 @@
+[DRY_RUN] repo_root=/home/keivn/openVLA/Raccoonbot_Openvla
+[DRY_RUN] checkpoint_dir=/home/keivn/openVLA/checkpoint
+[DRY_RUN] log_file=/home/keivn/openVLA/Raccoonbot_Openvla/results/logs/baseline_inference_server.txt
+[DRY_RUN] python_bin=python3
+[DRY_RUN] command: python3 openvla_server.py --model_path /home/keivn/openVLA/checkpoint --default-unnorm-key raccoon_pick_place --host 0.0.0.0 --port 8000 --device cuda

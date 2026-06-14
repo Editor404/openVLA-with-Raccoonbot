@@ -1,13 +1,14 @@
 <!-- 로보메이션 라쿤봇 MuJoCo 모델 --> <!-- Robomation RaccoonBot MuJoCo Model -->
 
 <mujoco model="RaccoonBot_S">
-  <compiler inertiafromgeom="false" angle="radian" meshdir="assets"/>
+  <compiler inertiafromgeom="false" angle="radian" meshdir="assets" autolimits="true"/>
   <option integrator="implicitfast" timestep="0.0002" cone="elliptic" noslip_iterations="100"/>
 
   <default>
     <!-- class 선언 (그룹별로 묶어서 물리계산에 사용할 것과 시각적요소로만 사용할것 분리 -->
     <default class="collision">
-      <geom group="3" type="mesh" rgba="255 0 0 0.1"/> <!-- 그룹 3부터 안보임. 보려면 키보드 숫자 누르면됨. -->
+      <geom group="3" type="mesh" rgba="255 0 0 0.1"
+            friction="3 0.1 0.1" condim="6"/> <!-- grasp 중 finger mesh 접촉 마찰 유지 -->
     </default>
 
     <default class="visual">
@@ -15,7 +16,7 @@
     </default>
 
     <!-- 조인트 기본값 설정 -->
-    <joint damping="0.001"></joint>
+    <joint damping="0.005" armature="0.00002"></joint>
   </default>
 
   <asset>
@@ -66,7 +67,7 @@
 
       <body name="Link1" pos="0 0 0.057088">
         <inertial pos="-0.013986 -0.0022667 0.020829" quat="0.2836 0.500773 0.328724 0.748824" mass="0.1138" diaginertia="5.60418e-05 5.26103e-05 3.52979e-05"/>
-        <joint name="Joint1" pos="0 0 0" axis="0 0 1" range="-2.0944 2.0944" damping="0" armature="0" frictionloss="0"/>
+        <joint name="Joint1" pos="0 0 0" axis="0 0 1" range="-2.0944 2.0944" damping="0.02" armature="0.001" frictionloss="0"/>
         <geom class="collision" type="mesh" mesh="Link1"/> <!-- 물리 계산용 -->
         <geom class="visual" type="mesh" mesh="Link1_cover" material="Black"/> <!-- 색칠 -->
         <geom class="visual" type="mesh" mesh="Link1_sticker" material="Gray"/> <!-- 색칠 -->
@@ -74,7 +75,7 @@
 
         <body name="Link2" pos="0 0 0.023662" quat="0.499998 -0.5 -0.500002 0.5">
           <inertial pos="0.0068563 -0.07084 0.008848" quat="0.614196 0.689345 -0.323933 0.206482" mass="0.0687" diaginertia="0.000109909 9.71792e-05 1.81218e-05"/>
-          <joint name="Joint2" pos="0 0 0" axis="0 0 -1" range="-1.5707 0.5237" damping="0" armature="0" frictionloss="0"/>
+          <joint name="Joint2" pos="0 0 0" axis="0 0 -1" range="-1.5707 0.5237" damping="0.02" armature="0.001" frictionloss="0"/>
           <geom class="collision" type="mesh" mesh="Link2"/> <!-- 물리 계산용 -->
           <geom class="visual" type="mesh" mesh="Link2_cover" material="Black"/> <!-- 색칠 -->
           <geom class="visual" type="mesh" mesh="Link2_sticker" material="Gray"/> <!-- 색칠 -->
@@ -82,7 +83,7 @@
 
           <body name="Link3" pos="1.0056e-05 -0.1 0" quat="-3.67321e-06 0 0 1">
             <inertial pos="0.0095601 0.090032 0.013618" quat="0.697287 0.617503 -0.178314 0.317308" mass="0.058" diaginertia="5.14233e-05 4.48418e-05 1.03349e-05"/>
-            <joint name="Joint3" pos="0 0 0" axis="0 0 -1" range="-2.618 0" damping="0" armature="0" frictionloss="0"/>
+            <joint name="Joint3" pos="0 0 0" axis="0 0 -1" range="-2.618 0" damping="0.02" armature="0.001" frictionloss="0"/>
             <geom class="collision" type="mesh" mesh="Link3"/> <!-- 물리 계산용 -->
             <geom class="visual" type="mesh" mesh="Link3_cover" material="Black"/> <!-- 색칠 -->
             <geom class="visual" type="mesh" mesh="Link3_sticker" material="Gray"/> <!-- 색칠 -->
@@ -90,7 +91,7 @@
 
             <body name="Link4" pos="-1.0056e-05 0.1 0">
               <inertial pos="0.00246483 0.0280152 0.0033435" quat="0.767161 0.570932 -0.211927 0.201462" mass="0.0247" diaginertia="8.82308e-06 8.70279e-06 3.10133e-06"/>
-              <joint name="Joint4" pos="0 0 0" axis="0 0 -1" range="-1.8326 1.8326" damping="0" armature="0" frictionloss="0"/>
+              <joint name="Joint4" pos="0 0 0" axis="0 0 -1" range="-1.8326 1.8326" damping="0.02" armature="0.001" frictionloss="0"/>
               <geom class="collision" type="mesh" mesh="Link4"/> <!-- 물리 계산용 -->
               <geom class="collision" type="mesh" mesh="Gripper_Body"/> <!-- 물리 계산용 -->
               <geom class="visual" type="mesh" mesh="Link4_black_screw" material="Black"/> <!-- 색칠 -->
@@ -181,11 +182,11 @@
 
   <actuator> <!-- 액추에이터(모터) -->
     <!-- position 위치제어모드 / name: 제어할 때 부를 이름, joint: 실제로 돌리는 조인트명, kp: 비례Gain, ctrlrange: 입력제한범위 -->
-    <position name="Joint1" joint="Joint1" ctrlrange="-2.0944 2.0944" kp="10" kv="1" forcerange="-0.08 0.08"/> <!-- 단위 rad, Nm -->
-    <position name="Joint2" joint="Joint2" ctrlrange="-1.5707 0.5237" kp="30" kv="10" forcerange="-0.5 0.5"/> <!-- forcerange에 모터스펙 Pull-In Torque 사용 -->
-    <position name="Joint3" joint="Joint3" ctrlrange="-2.6180 0.0000" kp="30" kv="10" forcerange="-0.2 0.2"/>
-    <position name="Joint4" joint="Joint4" ctrlrange="-1.8327 1.8327" kp="30" kv="10" forcerange="-0.2 0.2"/>
-    <position name="Gripper" joint="Gripper_L_Inner" ctrlrange="-0.85 0.15701" kp="2.5" forcerange="-0.05 0.05"/> <!-- 정확한 force 모름 -->  </actuator>
+    <general name="Joint1" joint="Joint1" ctrlrange="-2.0944 2.0944" gainprm="10" biastype="affine" biasprm="0 -10 -1" forcerange="-0.08 0.08"/> <!-- 단위 rad, Nm -->
+    <general name="Joint2" joint="Joint2" ctrlrange="-1.5707 0.5237" gainprm="30" biastype="affine" biasprm="0 -30 -10" forcerange="-0.5 0.5"/> <!-- forcerange에 모터스펙 Pull-In Torque 사용 -->
+    <general name="Joint3" joint="Joint3" ctrlrange="-2.6180 0.0000" gainprm="30" biastype="affine" biasprm="0 -30 -10" forcerange="-0.2 0.2"/>
+    <general name="Joint4" joint="Joint4" ctrlrange="-1.8327 1.8327" gainprm="30" biastype="affine" biasprm="0 -30 -10" forcerange="-0.2 0.2"/>
+    <position name="Gripper" joint="Gripper_L_Inner" ctrlrange="-0.85 0.15701" kp="5" forcerange="-0.2 0.2"/> <!-- grasp 유지력을 위해 접촉 force 여유 확보 -->  </actuator>
 
   <sensor>
     <touch name="sensor_L" site="L_touch_site"/>

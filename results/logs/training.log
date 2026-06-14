@@ -1,0 +1,41 @@
+# Extracted from ../raccoon_lab1.ipynb cell 38 on 2026-06-14.
+# This is historical executed-output evidence; model artifacts are intentionally excluded.
+torchrun --standalone --nnodes 1 --nproc-per-node 1 vla-scripts/finetune.py \
+  --vla_path openvla/openvla-7b \
+  --data_root_dir /data/yb/Raccoonbot_Openvla/tensorflow_datasets \
+  --dataset_name raccoon_pick_place \
+  --run_root_dir /data/yb/Raccoonbot_Openvla/openvla/openvla-runs \
+  --adapter_tmp_dir /data/yb/Raccoonbot_Openvla/openvla/openvla-adapter-tmp \
+  --lora_rank 32 \
+  --batch_size 8 \
+  --grad_accumulation_steps 2 \
+  --learning_rate 2e-4 \
+  --max_steps 2000 \
+  --save_steps 500 \
+  --run_id_note raccoon-eef-v100
+Fine-tuning OpenVLA Model `openvla/openvla-7b` on `raccoon_pick_place`
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  4.37it/s]
+trainable params: 110,828,288 || all params: 7,652,065,472 || trainable%: 1.4483
+# raccoon_pick_place: ======================================================1.000000 #
+06/09 [03:13:17] INFO     | >> [*] Saved dataset statistics    data_utils.py:294
+ 25%|██████████                              | 500/2000 [13:04<39:05,  1.56s/it]Saving Model Checkpoint for Step 500
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.90it/s]
+Saved Model Checkpoint for Step 500 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug
+ 25%|█████████                           | 501/2000 [24:59<89:47:23, 215.64s/it]Saving Model Checkpoint for Step 500
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.80it/s]
+Saved Model Checkpoint for Step 500 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug
+ 50%|███████████████████▌                   | 1000/2000 [50:22<26:51,  1.61s/it]Saving Model Checkpoint for Step 1000
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.64it/s]
+Saved Model Checkpoint for Step 1000 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug
+ 50%|████████████████▌                | 1001/2000 [1:02:15<59:39:06, 214.96s/it]Saving Model Checkpoint for Step 1000
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.10it/s]
+Saved Model Checkpoint for Step 1000 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug
+ 75%|███████████████████████████▊         | 1500/2000 [1:27:50<13:11,  1.58s/it]Saving Model Checkpoint for Step 1500
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.44it/s]
+Saved Model Checkpoint for Step 1500 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug
+ 75%|████████████████████████▊        | 1501/2000 [1:39:52<30:10:50, 217.74s/it]Saving Model Checkpoint for Step 1500
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.33it/s]
+Saved Model Checkpoint for Step 1500 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug
+100%|█████████████████████████████████████| 2000/2000 [2:05:23<00:00,  1.58s/it]Saving Model Checkpoint for Step 2000
+Loading checkpoint shards: 100%|██████████████████| 3/3 [00:00<00:00,  3.67it/s]
+Saved Model Checkpoint for Step 2000 at: /data/yb/Raccoonbot_Openvla/openvla/openvla-runs/openvla-7b+raccoon_pick_place+b16+lr-0.0002+lora-r32+dropout-0.0--raccoon-eef-v100--image_aug

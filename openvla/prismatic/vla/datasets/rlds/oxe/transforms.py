@@ -844,6 +844,18 @@ def raccoon_pick_place_transform(trajectory):
     return trajectory
 
 
+def raccoon_colored_objects_transform(trajectory):
+    """Convert collector gripper labels (0=open, 1=close) to OpenVLA convention."""
+    trajectory["action"] = tf.concat(
+        [
+            trajectory["action"][:, :6],
+            1.0 - tf.clip_by_value(trajectory["action"][:, -1:], 0.0, 1.0),
+        ],
+        axis=1,
+    )
+    return trajectory
+
+
 # === Registry ===
 OXE_STANDARDIZATION_TRANSFORMS = {
     "bridge_oxe": bridge_oxe_dataset_transform,
@@ -925,4 +937,7 @@ OXE_STANDARDIZATION_TRANSFORMS = {
 
     ### Raccoon datasets
     "raccoon_pick_place":raccoon_pick_place_transform,
+    "raccoon_grasp": raccoon_colored_objects_transform,
+    "raccoon_push": raccoon_colored_objects_transform,
+    "raccoon_pick_and_place": raccoon_colored_objects_transform,
 }
