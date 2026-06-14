@@ -1,6 +1,6 @@
 # RaccoonBot OpenVLA 파이프라인 확장
 
-FAIR Lab OpenVLA 과제를 위해 RaccoonBot의 MuJoCo 데이터 생성, RLDS/TFDS
+피지컬 AI 프로젝트를 위해 RaccoonBot의 MuJoCo 데이터 생성, RLDS/TFDS
 변환, OpenVLA LoRA 학습 및 추론 과정을 확장한 저장소입니다.
 
 ## 주요 구현 내용
@@ -325,7 +325,7 @@ python3 -m unittest -v \
 
 | 경로 | 내용 |
 |---|---|
-| `report.pdf` | 한국어 과제 보고서 |
+| `report.pdf` | 한국어 프로젝트 보고서 |
 | `docs/short_report.md` | 보고서 원문 |
 | `docs/assignment_worklog.md` | 구현 과정 기록 |
 | `results/episode_visualizations/` | 에피소드 시각화 |
@@ -333,10 +333,9 @@ python3 -m unittest -v \
 | `results/logs/training.log` | 기존 A100 학습 기록 발췌 |
 | `results/logs/inference_server.log` | 추론 서버 및 action 출력 발췌 |
 
-
 ## 참고
 
-- 과제 보고서: [`report.pdf`](report.pdf)
+- 프로젝트 보고서: [`report.pdf`](report.pdf)
 - 상세 작업 기록: [`docs/assignment_worklog.md`](docs/assignment_worklog.md)
 - 원본 FAIR Lab 저장소:
   <https://github.com/KWU-FAIR-LAB/Raccoonbot_Openvla>

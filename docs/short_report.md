@@ -1,13 +1,13 @@
 ---
 title: "RaccoonBot OpenVLA 파이프라인 확장"
-author: "FAIR Lab 과제"
+author: "피지컬 AI 프로젝트"
 date: "2026-06-14"
 ---
 
 # 1. 목표
 
 기존 파이프라인은 단일 문장 형식으로 원기둥을 색상에 따라 잡는 작업만
-지원했다. 본 과제에서는 데이터셋의 물체와 작업 종류를 확장하고,
+지원했다. 본 프로젝트에서는 데이터셋의 물체와 작업 종류를 확장하고,
 RaccoonBot 시뮬레이션 데이터가 OpenVLA 학습에 안전하고 일관되게
 사용되도록 전체 변환 과정을 개선했다.
 
@@ -61,7 +61,7 @@ task-balanced 데이터의 축별 최대 이동량은 약 4.9 mm 이하로,
 실행된 노트북 출력에는 A100 GPU에서 `openvla/openvla-7b`를 LoRA
 rank 32, effective batch size 16, learning rate `2e-4`로 학습한 기록이
 있다. 500, 1,000, 1,500 step에서 checkpoint 저장이 확인되었다.
-과제 지침에 따라 모델 가중치는 Git에 포함하지 않았으며, 실행 기록의
+프로젝트 저장소에는 모델 가중치를 포함하지 않았으며, 실행 기록의
 일부를 `results/logs/training.log`에 보존했다.
 
 `results/logs/inference_server.log`에는 checkpoint 로딩,
